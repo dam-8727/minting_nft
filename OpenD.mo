@@ -9,36 +9,38 @@ import Iter "mo:base/Iter";
 import Array "mo:base/Array"
 
 actor OpenD {
-    // Custom datatype for listing
     private type Listing = {
         itemOwner: Principal;
         itemPrice: Nat;
     };
 
-    // HashMaps to store NFTs, Owners, and Listings
     var mapOfNFT = HashMap.HashMap<Principal, NFTActorClass.NFT>(1, Principal.equal, Principal.hash);
     var mapOfOwners = HashMap.HashMap<Principal, List.List<Principal>>(1, Principal.equal, Principal.hash);
     var mapOfListings = HashMap.HashMap<Principal, Listing>(1, Principal.equal, Principal.hash);
+    var freeMinters = HashMap.HashMap<Principal, Bool>(1, Principal.equal, Principal.hash);
+    var freeMintCount: Nat = 0;
 
-    // Function to mint NFT from the frontend
+    //Function for minting NFT at the Frontend
     public shared(msg) func mint(imgData: [Nat8], name: Text, description: Text, price: Nat): async Principal {
-        let owner = msg.caller;  // The owner of the minted NFT
+        let owner = msg.caller;
+        
+        
+        if (freeMintCount < 10 && freeMinters.get(owner) == null) {
+            freeMinters.put(owner, true);
+            freeMintCount += 1;
+            Debug.print("Minting for free for user: " # Principal.toText(owner));
+        } else {
+            //adding cycles if the limit of 10 exceeds.
+            Cycles.add(100_500_000_000);
+        }
 
-        // Add cycles for minting 
-        Cycles.add(100_500_000_000);
-
-        // Create a new NFT with the provided name, description, and price
         let newNFT = await NFTActorClass.NFT(name, owner, imgData, description, price);
-
-        // Get the new NFT's Principal (Canister ID)
+     
         let newNFTPrincipal = await newNFT.getCanisterId();
 
-        // Store the new NFT in the map
         mapOfNFT.put(newNFTPrincipal, newNFT);
         addToOwnershipMap(owner, newNFTPrincipal);
-     
 
-        // Return the Principal ID of the minted NFT
         return newNFTPrincipal;
     };
     
